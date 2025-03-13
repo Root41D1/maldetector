@@ -5,6 +5,9 @@ import { toast } from "sonner";
 const VIRUSTOTAL_API_KEY = "4bcfb3fa35c4ad66dbf543bee7cb70d411d1298d2ef1d219969e4c923bb020c5";
 const VIRUSTOTAL_BASE_URL = "https://www.virustotal.com/api/v3";
 
+// CORS proxy URL - Add this to handle CORS issues
+const CORS_PROXY = "https://corsproxy.io/?";
+
 // Types
 export interface FileScanResult {
   id: string;
@@ -74,26 +77,28 @@ export const virusTotalService = {
    * Upload a file to VirusTotal for scanning
    */
   async uploadFile(file: File): Promise<string> {
-    const url = new URL('/files', VIRUSTOTAL_BASE_URL);
-    
-    // Create form data with the file
-    const formData = new FormData();
-    formData.append('file', file);
-    
     try {
-      // First, get an upload URL
-      const uploadUrlResponse = await fetch(`${VIRUSTOTAL_BASE_URL}/files/upload_url`, {
+      // Use FormData to send the file
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      // First, get an upload URL using the CORS proxy
+      const uploadUrlResponse = await fetch(`${CORS_PROXY}${VIRUSTOTAL_BASE_URL}/files/upload_url`, {
         method: 'GET',
         headers: {
           'x-apikey': VIRUSTOTAL_API_KEY
         }
       });
       
-      const { data } = await handleResponse(uploadUrlResponse);
+      if (!uploadUrlResponse.ok) {
+        throw new ApiError('Failed to get upload URL', uploadUrlResponse.status);
+      }
+      
+      const { data } = await uploadUrlResponse.json();
       const uploadUrl = data;
       
-      // Now upload to the provided URL
-      const uploadResponse = await fetch(uploadUrl, {
+      // Now upload to the provided URL using the CORS proxy
+      const uploadResponse = await fetch(`${CORS_PROXY}${uploadUrl}`, {
         method: 'POST',
         body: formData,
         headers: {
@@ -123,7 +128,7 @@ export const virusTotalService = {
    */
   async getFileReport(fileId: string): Promise<FileScanResult> {
     try {
-      const response = await fetch(`${VIRUSTOTAL_BASE_URL}/analyses/${fileId}`, {
+      const response = await fetch(`${CORS_PROXY}${VIRUSTOTAL_BASE_URL}/analyses/${fileId}`, {
         method: 'GET',
         headers: {
           'x-apikey': VIRUSTOTAL_API_KEY
@@ -148,7 +153,7 @@ export const virusTotalService = {
    */
   async checkFileByHash(hash: string): Promise<FileScanResult | null> {
     try {
-      const response = await fetch(`${VIRUSTOTAL_BASE_URL}/files/${hash}`, {
+      const response = await fetch(`${CORS_PROXY}${VIRUSTOTAL_BASE_URL}/files/${hash}`, {
         method: 'GET',
         headers: {
           'x-apikey': VIRUSTOTAL_API_KEY
