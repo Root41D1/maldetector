@@ -3,7 +3,7 @@ import React, { useCallback, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { Button } from '@/components/ui/button';
 import { Upload, FileSymlink, Shield, AlertCircle } from 'lucide-react';
-import { toast } from '@/components/ui/sonner';
+import { toast } from 'sonner';
 import { Progress } from '@/components/ui/progress';
 import { calculateSHA256, formatFileSize, getFileType } from '@/utils/fileUtils';
 import { virusTotalService } from '@/services/virusTotalService';
@@ -87,7 +87,7 @@ const ScannerUpload: React.FC = () => {
         fileSize: file.size,
         fileType: getFileType(file.name),
         scanDate: new Date(),
-        threatLevel: 'unknown',
+        threatLevel: 'unknown' as 'unknown', // Type assertion to fix the error
       };
       
       addScan(scanItem);

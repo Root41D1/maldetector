@@ -1,5 +1,5 @@
 
-import { toast } from "@/components/ui/sonner";
+import { toast } from "sonner";
 
 // VirusTotal API constants
 const VIRUSTOTAL_API_KEY = "4bcfb3fa35c4ad66dbf543bee7cb70d411d1298d2ef1d219969e4c923bb020c5";
