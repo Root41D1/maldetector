@@ -65,7 +65,9 @@ const ScanResultPage: React.FC = () => {
           <>
             {scanItem && scanResult && (
               <ScanResultSummary
-                scanItem={scanItem}
+                fileName={scanItem.fileName}
+                fileSize={scanItem.fileSize}
+                scanDate={scanItem.scanDate}
                 scanResult={scanResult}
               />
             )}
