@@ -7,6 +7,9 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ScanHistoryProvider } from "@/contexts/ScanHistoryContext";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
+import ScanPage from "./pages/ScanPage";
+import HistoryPage from "./pages/HistoryPage";
+import ScanResultPage from "./pages/ScanResultPage";
 
 const queryClient = new QueryClient();
 
@@ -19,6 +22,9 @@ const App = () => (
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<Index />} />
+            <Route path="/scan" element={<ScanPage />} />
+            <Route path="/history" element={<HistoryPage />} />
+            <Route path="/scan-result/:id" element={<ScanResultPage />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
