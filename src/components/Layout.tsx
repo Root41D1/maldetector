@@ -15,6 +15,7 @@ import {
 import { cn } from '@/lib/utils';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { useIsMobile } from '@/hooks/use-mobile';
+import UserControls from './UserControls';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -83,6 +84,9 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           </div>
           <Separator className="mb-6" />
           <NavItems />
+          <div className="mt-auto pt-6">
+            <UserControls />
+          </div>
         </div>
       )}
 
@@ -94,18 +98,21 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             <span className="font-semibold text-lg">MalDetector</span>
           </div>
           
-          <Sheet open={isOpen} onOpenChange={setIsOpen}>
-            <SheetTrigger asChild>
-              <Button variant="ghost" size="icon">
-                {isOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-              </Button>
-            </SheetTrigger>
-            <SheetContent side="left" className="w-64 pt-16 glass-morphism backdrop-blur-lg">
-              <div className="flex flex-col h-full">
-                <NavItems />
-              </div>
-            </SheetContent>
-          </Sheet>
+          <div className="flex items-center gap-2">
+            <UserControls />
+            <Sheet open={isOpen} onOpenChange={setIsOpen}>
+              <SheetTrigger asChild>
+                <Button variant="ghost" size="icon">
+                  {isOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="left" className="w-64 pt-16 glass-morphism backdrop-blur-lg">
+                <div className="flex flex-col h-full">
+                  <NavItems />
+                </div>
+              </SheetContent>
+            </Sheet>
+          </div>
         </header>
       )}
 

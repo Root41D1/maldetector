@@ -2,14 +2,16 @@
 import React, { useCallback, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { Button } from '@/components/ui/button';
-import { Upload, FileSymlink, Shield, AlertCircle } from 'lucide-react';
+import { Upload, FileSymlink, Shield, AlertCircle, Lock, Infinity, Check, CreditCard } from 'lucide-react';
 import { toast } from 'sonner';
 import { Progress } from '@/components/ui/progress';
 import { calculateSHA256, formatFileSize, getFileType } from '@/utils/fileUtils';
 import { virusTotalService } from '@/services/virusTotalService';
 import { useScanHistory } from '@/contexts/ScanHistoryContext';
-import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
+import { useNavigate, Link } from 'react-router-dom';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 const MAX_FILE_SIZE = 32 * 1024 * 1024; // 32MB (VirusTotal limit for free tier)
 
@@ -17,10 +19,24 @@ const ScannerUpload: React.FC = () => {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [showSubscribeDialog, setShowSubscribeDialog] = useState(false);
   const { addScan } = useScanHistory();
+  const { user, isAuthenticated, remainingScans, incrementScanCount, isPremium } = useAuth();
   const navigate = useNavigate();
 
   const onDrop = useCallback(async (acceptedFiles: File[]) => {
+    if (!isAuthenticated) {
+      toast.error('Please log in to scan files');
+      navigate('/login');
+      return;
+    }
+
+    // Check scan limit for free users
+    if (remainingScans <= 0 && !isPremium) {
+      setShowSubscribeDialog(true);
+      return;
+    }
+    
     if (acceptedFiles.length === 0) return;
     
     const file = acceptedFiles[0];
@@ -77,6 +93,8 @@ const ScannerUpload: React.FC = () => {
         };
         
         addScan(scanItem);
+        // Increment user's scan count
+        incrementScanCount();
         toast.success('File analysis retrieved from VirusTotal');
         
         // Navigate to result page
@@ -104,6 +122,8 @@ const ScannerUpload: React.FC = () => {
         };
         
         addScan(scanItem);
+        // Increment user's scan count
+        incrementScanCount();
         
         // Navigate to the analysis page
         toast.success('File uploaded for scanning');
@@ -125,6 +145,8 @@ const ScannerUpload: React.FC = () => {
         };
         
         addScan(scanItem);
+        // Increment user's scan count
+        incrementScanCount();
         
         toast.warning('Using offline mode for scanning');
         navigate(`/scan-result/${fileHash}`);
@@ -138,7 +160,7 @@ const ScannerUpload: React.FC = () => {
       setIsUploading(false);
       setUploadProgress(0);
     }
-  }, [addScan, navigate]);
+  }, [addScan, navigate, isAuthenticated, remainingScans, isPremium, incrementScanCount]);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
@@ -167,6 +189,38 @@ const ScannerUpload: React.FC = () => {
 
   return (
     <div className="w-full max-w-3xl mx-auto p-6">
+      {!isAuthenticated && (
+        <Alert className="mb-4">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Authentication Required</AlertTitle>
+          <AlertDescription>
+            Please <Link to="/login" className="font-medium underline">log in</Link> or{' '}
+            <Link to="/signup" className="font-medium underline">sign up</Link> to scan files.
+          </AlertDescription>
+        </Alert>
+      )}
+      
+      {isAuthenticated && !isPremium && (
+        <Alert className="mb-4">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Scan Limit</AlertTitle>
+          <AlertDescription>
+            You have {remainingScans} scans remaining on your free plan.{' '}
+            <Link to="/subscription" className="font-medium underline">Upgrade to premium</Link> for unlimited scans.
+          </AlertDescription>
+        </Alert>
+      )}
+      
+      {isAuthenticated && isPremium && (
+        <Alert className="mb-4 border-primary/50 bg-primary/10">
+          <Infinity className="h-4 w-4 text-primary" />
+          <AlertTitle>Premium Account</AlertTitle>
+          <AlertDescription>
+            You have unlimited scans with your premium subscription.
+          </AlertDescription>
+        </Alert>
+      )}
+      
       {uploadError && (
         <Alert variant="destructive" className="mb-4">
           <AlertCircle className="h-4 w-4" />
@@ -192,6 +246,10 @@ const ScannerUpload: React.FC = () => {
             <div className="p-4 rounded-full bg-primary/10">
               <FileSymlink size={64} className="text-primary animate-pulse" />
             </div>
+          ) : !isAuthenticated ? (
+            <div className="p-4 rounded-full bg-primary/5">
+              <Lock size={64} className="text-primary" />
+            </div>
           ) : (
             <div className="p-4 rounded-full bg-primary/5">
               <Shield size={64} className="text-primary" />
@@ -213,11 +271,21 @@ const ScannerUpload: React.FC = () => {
         ) : (
           <>
             <p className="text-muted-foreground text-center mb-6">
-              Drag and drop a file here, or click to select a file for malware scanning
+              {!isAuthenticated 
+                ? 'Log in to scan files for malware and threats' 
+                : 'Drag and drop a file here, or click to select a file for malware scanning'}
             </p>
             
-            <Button className="px-8" disabled={isUploading}>
-              <Upload className="mr-2 h-4 w-4" /> Select File
+            <Button className="px-8" disabled={isUploading || (!isAuthenticated) || (remainingScans <= 0 && !isPremium)}>
+              {!isAuthenticated ? (
+                <>
+                  <Lock className="mr-2 h-4 w-4" /> Authentication Required
+                </>
+              ) : (
+                <>
+                  <Upload className="mr-2 h-4 w-4" /> Select File
+                </>
+              )}
             </Button>
             
             <div className="mt-8 flex items-center text-sm text-muted-foreground">
@@ -227,6 +295,48 @@ const ScannerUpload: React.FC = () => {
           </>
         )}
       </div>
+      
+      {/* Subscribe Dialog */}
+      <Dialog open={showSubscribeDialog} onOpenChange={setShowSubscribeDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Scan Limit Reached</DialogTitle>
+            <DialogDescription>
+              You've used all your free scans. Upgrade to Premium for unlimited scans.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <div className="flex items-center gap-2 mb-4">
+              <Shield className="h-5 w-5 text-primary" />
+              <span className="font-medium">Premium Benefits:</span>
+            </div>
+            <ul className="space-y-2 ml-6">
+              <li className="flex items-start gap-2">
+                <Check className="h-4 w-4 text-primary mt-0.5" />
+                <span>Unlimited file scans</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <Check className="h-4 w-4 text-primary mt-0.5" />
+                <span>Advanced threat detection</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <Check className="h-4 w-4 text-primary mt-0.5" />
+                <span>Permanent scan history</span>
+              </li>
+            </ul>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowSubscribeDialog(false)}>Cancel</Button>
+            <Button onClick={() => {
+              setShowSubscribeDialog(false);
+              navigate('/subscription');
+            }}>
+              <CreditCard className="mr-2 h-4 w-4" />
+              Subscribe $20/year
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
