@@ -1,6 +1,8 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
+import { User as SupabaseUser } from '@supabase/supabase-js';
 
 // Define types for our authentication
 export interface User {
@@ -26,38 +28,79 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// For demo purposes, we'll use localStorage to persist the user
-const STORAGE_KEY = 'maldetector_auth';
+// Constants
 const MAX_FREE_SCANS = 10;
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
+  const [supabaseUser, setSupabaseUser] = useState<SupabaseUser | null>(null);
+  const [loading, setLoading] = useState(true);
   
-  // Load user from localStorage on component mount
+  // Check for session on load
   useEffect(() => {
-    try {
-      const savedUser = localStorage.getItem(STORAGE_KEY);
-      if (savedUser) {
-        const parsedUser = JSON.parse(savedUser);
-        // Convert expiry date string back to Date object if it exists
-        if (parsedUser.subscriptionExpiresAt) {
-          parsedUser.subscriptionExpiresAt = new Date(parsedUser.subscriptionExpiresAt);
+    const checkSession = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (session?.user) {
+          setSupabaseUser(session.user);
+          await fetchUserProfile(session.user);
         }
-        setUser(parsedUser);
+      } catch (error) {
+        console.error('Error checking session:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    checkSession();
+    
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        if (session?.user) {
+          setSupabaseUser(session.user);
+          await fetchUserProfile(session.user);
+        } else {
+          setSupabaseUser(null);
+          setUser(null);
+        }
+      }
+    );
+    
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
+  
+  // Fetch the user's profile from the database
+  const fetchUserProfile = async (supabaseUser: SupabaseUser) => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', supabaseUser.id)
+        .single();
+      
+      if (error) {
+        throw error;
+      }
+      
+      if (data) {
+        setUser({
+          id: supabaseUser.id,
+          email: supabaseUser.email || '',
+          name: data.name,
+          isSubscribed: data.is_subscribed || false,
+          scanCount: data.scan_count || 0,
+          subscriptionExpiresAt: data.subscription_expires_at ? new Date(data.subscription_expires_at) : undefined
+        });
       }
     } catch (error) {
-      console.error('Failed to load user data:', error);
+      console.error('Error fetching user profile:', error);
+      toast.error('Failed to load user profile');
     }
-  }, []);
-
-  // Save user to localStorage whenever it changes
-  useEffect(() => {
-    if (user) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(user));
-    } else {
-      localStorage.removeItem(STORAGE_KEY);
-    }
-  }, [user]);
+  };
 
   // Check if user is premium
   const isPremium = (): boolean => {
@@ -75,98 +118,139 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Calculate remaining scans
   const remainingScans = user ? (isPremium() ? Infinity : MAX_FREE_SCANS - user.scanCount) : 0;
 
-  // Login function - in a real app, this would validate with a backend
+  // Login function using Supabase
   const login = async (email: string, password: string) => {
-    // Simple validation
     if (!email || !password) {
       throw new Error('Email and password are required');
     }
     
-    // In a real app, this would call an API
-    // For demo, we'll check if user exists in localStorage
     try {
-      const savedUser = localStorage.getItem(STORAGE_KEY);
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password
+      });
       
-      if (savedUser) {
-        const parsedUser = JSON.parse(savedUser);
-        if (parsedUser.email === email) {
-          // In a real app, you would check password hash
-          setUser(parsedUser);
-          toast.success('Login successful');
-          return;
-        }
+      if (error) {
+        throw error;
       }
       
-      throw new Error('Invalid credentials');
-    } catch (error) {
+      if (data?.user) {
+        toast.success('Login successful');
+      }
+    } catch (error: any) {
       console.error('Login error:', error);
-      toast.error('Login failed. Please check your credentials.');
+      toast.error(error.message || 'Login failed. Please check your credentials.');
       throw error;
     }
   };
 
-  // Signup function - in a real app, this would register with a backend
+  // Signup function using Supabase
   const signup = async (email: string, password: string, name?: string) => {
-    // Simple validation
     if (!email || !password) {
       throw new Error('Email and password are required');
     }
     
-    // Check if user already exists
-    const savedUser = localStorage.getItem(STORAGE_KEY);
-    if (savedUser) {
-      const parsedUser = JSON.parse(savedUser);
-      if (parsedUser.email === email) {
-        toast.error('User with this email already exists');
-        throw new Error('User already exists');
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            name
+          }
+        }
+      });
+      
+      if (error) {
+        throw error;
       }
+      
+      toast.success('Account created successfully');
+    } catch (error: any) {
+      console.error('Signup error:', error);
+      toast.error(error.message || 'Failed to create account');
+      throw error;
     }
-    
-    // Create a new user
-    const newUser: User = {
-      id: Date.now().toString(),
-      email,
-      name,
-      isSubscribed: false,
-      scanCount: 0
-    };
-    
-    setUser(newUser);
-    toast.success('Account created successfully');
   };
 
-  // Logout function
-  const logout = () => {
-    setUser(null);
-    localStorage.removeItem(STORAGE_KEY);
-    toast.info('Logged out successfully');
+  // Logout function using Supabase
+  const logout = async () => {
+    try {
+      const { error } = await supabase.auth.signOut();
+      
+      if (error) {
+        throw error;
+      }
+      
+      setUser(null);
+      toast.info('Logged out successfully');
+    } catch (error) {
+      console.error('Logout error:', error);
+      toast.error('Failed to log out');
+    }
   };
 
   // Increment scan count
-  const incrementScanCount = () => {
+  const incrementScanCount = async () => {
     if (!user) return;
     
-    setUser({
-      ...user,
-      scanCount: user.scanCount + 1
-    });
+    try {
+      // Update local state
+      const newScanCount = user.scanCount + 1;
+      setUser({
+        ...user,
+        scanCount: newScanCount
+      });
+      
+      // Update in database
+      const { error } = await supabase
+        .from('profiles')
+        .update({ scan_count: newScanCount })
+        .eq('id', user.id);
+      
+      if (error) {
+        throw error;
+      }
+    } catch (error) {
+      console.error('Error incrementing scan count:', error);
+      toast.error('Failed to update scan count');
+    }
   };
 
   // Subscribe to premium
-  const subscribe = () => {
+  const subscribe = async () => {
     if (!user) return;
     
-    // Set subscription for 1 year
-    const expiryDate = new Date();
-    expiryDate.setFullYear(expiryDate.getFullYear() + 1);
-    
-    setUser({
-      ...user,
-      isSubscribed: true,
-      subscriptionExpiresAt: expiryDate
-    });
-    
-    toast.success('Subscription successful! You now have unlimited scans.');
+    try {
+      // Set subscription for 1 year
+      const expiryDate = new Date();
+      expiryDate.setFullYear(expiryDate.getFullYear() + 1);
+      
+      // Update local state
+      setUser({
+        ...user,
+        isSubscribed: true,
+        subscriptionExpiresAt: expiryDate
+      });
+      
+      // Update in database
+      const { error } = await supabase
+        .from('profiles')
+        .update({ 
+          is_subscribed: true,
+          subscription_expires_at: expiryDate.toISOString()
+        })
+        .eq('id', user.id);
+      
+      if (error) {
+        throw error;
+      }
+      
+      toast.success('Subscription successful! You now have unlimited scans.');
+    } catch (error) {
+      console.error('Error subscribing:', error);
+      toast.error('Failed to process subscription');
+    }
   };
 
   return (
