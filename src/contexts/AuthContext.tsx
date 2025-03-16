@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
@@ -24,6 +23,7 @@ interface AuthContextType {
   remainingScans: number;
   incrementScanCount: () => void;
   subscribe: () => void;
+  resetPassword: (email: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -253,6 +253,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  // Reset password function
+  const resetPassword = async (email: string) => {
+    if (!email) {
+      throw new Error('Email is required');
+    }
+    
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: window.location.origin + '/reset-password',
+      });
+      
+      if (error) {
+        throw error;
+      }
+      
+      toast.success('Password reset email sent. Check your inbox.');
+    } catch (error: any) {
+      console.error('Password reset error:', error);
+      toast.error(error.message || 'Failed to send password reset email');
+      throw error;
+    }
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -264,7 +287,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         logout,
         remainingScans,
         incrementScanCount,
-        subscribe
+        subscribe,
+        resetPassword
       }}
     >
       {children}

@@ -22,6 +22,8 @@ const LoginPage = () => {
   const navigate = useNavigate();
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const { resetPassword } = useAuth();
 
   const form = useForm<z.infer<typeof loginSchema>>({
     resolver: zodResolver(loginSchema),
@@ -43,6 +45,28 @@ const LoginPage = () => {
         setError(error.message);
       } else {
         setError('Failed to login. Please try again.');
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleResetPassword = async () => {
+    const email = form.getValues('email');
+    if (!email) {
+      setError('Please enter your email address');
+      return;
+    }
+    
+    setIsLoading(true);
+    try {
+      await resetPassword(email);
+      setShowForgotPassword(false);
+    } catch (error) {
+      if (error instanceof Error) {
+        setError(error.message);
+      } else {
+        setError('Failed to send reset email. Please try again.');
       }
     } finally {
       setIsLoading(false);
@@ -100,11 +124,49 @@ const LoginPage = () => {
                 )}
               />
               
+              <div className="flex justify-end">
+                <Button
+                  type="button"
+                  variant="link"
+                  className="px-0 text-sm"
+                  onClick={() => setShowForgotPassword(true)}
+                >
+                  Forgot password?
+                </Button>
+              </div>
+              
               <Button type="submit" className="w-full" disabled={isLoading}>
                 {isLoading ? 'Logging in...' : 'Sign In'}
               </Button>
             </form>
           </Form>
+
+          {showForgotPassword && (
+            <div className="mt-4 p-4 border rounded-md">
+              <h3 className="text-sm font-medium mb-2">Reset your password</h3>
+              <p className="text-xs text-muted-foreground mb-3">
+                Enter your email address and we'll send you a link to reset your password.
+              </p>
+              <div className="flex gap-2">
+                <Button 
+                  type="button" 
+                  size="sm" 
+                  onClick={handleResetPassword}
+                  disabled={isLoading}
+                >
+                  {isLoading ? 'Sending...' : 'Send reset link'}
+                </Button>
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => setShowForgotPassword(false)}
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          )}
         </CardContent>
         
         <CardFooter className="flex flex-col space-y-4">
