@@ -10,6 +10,7 @@ import NotFound from "./pages/NotFound";
 import ScanPage from "./pages/ScanPage";
 import HistoryPage from "./pages/HistoryPage";
 import ScanResultPage from "./pages/ScanResultPage";
+import SettingsPage from "./pages/SettingsPage";
 
 const queryClient = new QueryClient();
 
@@ -25,6 +26,7 @@ const App = () => (
             <Route path="/scan" element={<ScanPage />} />
             <Route path="/history" element={<HistoryPage />} />
             <Route path="/scan-result/:id" element={<ScanResultPage />} />
+            <Route path="/settings" element={<SettingsPage />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
