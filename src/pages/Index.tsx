@@ -1,4 +1,3 @@
-
 import React from 'react';
 import Layout from '@/components/Layout';
 import { Button } from '@/components/ui/button';
@@ -9,9 +8,12 @@ import RecentScans from '@/components/RecentScans';
 import ScanStats from '@/components/ScanStats';
 import { useScanHistory } from '@/contexts/ScanHistoryContext';
 import { Separator } from '@/components/ui/separator';
+import SubscriptionBanner from '@/components/SubscriptionBanner';
+import { useAuth } from '@/contexts/AuthContext';
 
 const Index = () => {
   const { history, getMaliciousScans } = useScanHistory();
+  const { isAuthenticated } = useAuth();
   const maliciousScans = getMaliciousScans();
   
   return (
@@ -24,6 +26,9 @@ const Index = () => {
             <p className="text-muted-foreground">Monitor and analyze your file scans in one place</p>
           </div>
           
+          {/* Subscription Banner */}
+          {isAuthenticated && <SubscriptionBanner />}
+
           {/* Welcome Card (for new users) */}
           {history.length === 0 && (
             <Card className="glass-panel mb-8">

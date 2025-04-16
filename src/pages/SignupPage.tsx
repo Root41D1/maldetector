@@ -44,7 +44,7 @@ const SignupPage = () => {
     
     try {
       await signup(values.email, values.password, values.name);
-      navigate('/');
+      navigate('/login');
     } catch (error) {
       if (error instanceof Error) {
         setError(error.message);
